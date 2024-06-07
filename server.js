@@ -45,28 +45,73 @@ const authenticateSession = (req, res, next) => {
     next();
 }
 
-app.post('/login', (req, res) =>{
+app.post('/login', (req, res) => {
     const { cpf, senha } = req.body;
 
     db.query('SELECT * FROM usuarios WHERE cpf = ? AND senha = ?', [cpf], // query para verificar se o cpf existe no banco de dados
-    async (err, results) => {
-        if(err) return res.status(500).send('Server com erro');
-        if(results.length === 0) {
-            return res.status(500).send('CPF ou senha incorretos');
+        async (err, results) => {
+            if (err) return res.status(500).send('Server com erro');
+            if (results.length === 0) {
+                return res.status(500).send('CPF ou senha incorretos');
 
-            const usuario = results[0];
-            const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
-                if(!senhaCorreta) return res.status(500).send(
+                const usuario = results[0];
+                const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
+                if (!senhaCorreta) return res.status(500).send(
                     'CPF ou senha incorretos');
 
-                 req.session.userID = usuario.idUsuarios;
-                 console.log('idUsuarios:', usuario.idUsuarios);
-                 res.json({ message: 'Login bem-sucedido!'});
+                req.session.userID = usuario.idUsuarios;
+                console.log('idUsuarios:', usuario.idUsuarios);
+                res.json({ message: 'Login bem-sucedido!' });
             }
-    }) 
+        })
+})
+
+app.post('/cadastro', (req, res) => {
+    const { cpf, senha, nome, email, celular, cep, logradouro, bairro, cidade, estado, imagem, Tipos_Usuarios_idTipos_Usuarios } = req.body;
+    cep = cep.replace(/-/g, '');
+    db.query(
+        'SELECT cpf FROM usuarios WHERE cpf = ?', [cpf], async (err, results) => {
+            if (err) {
+                console.error('Erro ao consultar o CPF:', err)
+
+                return res.status(500).json({ message: 'Erro ao verificar o CPF' });
 
 
+            }
+            if (results.length > 0) {
+                return res.status(400).json({ message: 'CPF já cadastrado' });
+            }
 
+            const senhacripto = await bcrypt.hash(senha, 10);
+            //primeiro argumento é variavel a ser cripto
+            //segundo argumento é o custo do hash
+
+            db.query('INSERT INTO usuarios (nome, email, cpf, senha, celular, cep, logradouro, bairro, cidade, estado, Tipos_Usuarios_idTipos_Usuarios, imagem) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+                [nome, email, cpf, senhacripto, celular, cep, logradouro, bairro, cidade, estado, Tipos_Usuarios_idTipos_Usuarios, imagem],
+                (err, results) => {
+                    if (err) {
+                        console.error('Erro ao inserir usuário:', err)
+                        return res.status(500).json({ message: 'Erro ao cadastrar usuário.' })
+                    } 
+                    console.log('Novo usuário inserido com sucesso:', results.idUsuarios);
+                    res.status(200).json({message: 'Usuário cadastrado com sucesso!'})
+                }
+
+
+        })
+})
+
+app.use(express.static('src'));
+app.use(express.static(__dirname + '/src'));
+
+//localhost:5000/login
+app.get('/login',(req, res) => {
+    res.sendFile(__dirname + '/src/login.html')
+})
+
+//localhost:5000/cadastro 
+app.get('/cadastro', (req, res) => {
+    res.sendFile(__dirname + '/src/cadastroUsuarios.html')
 })
 
 const PORT = process.env.PORT || 5000;
